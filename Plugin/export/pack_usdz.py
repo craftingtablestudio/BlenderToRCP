@@ -6,11 +6,44 @@ Creates USDZ files as stored (uncompressed) ZIP archives.
 
 import os
 import shutil
+import struct
 import zipfile
 from pathlib import Path
 from typing import Optional, List
 
-from .. import prefs as addon_prefs
+# USDZ requires every contained file's data to start on a 64-byte boundary so
+# readers can memory-map the layer straight out of the package. Padding goes in
+# the local file header's extra field, using the same dummy record OpenUSD's own
+# packager writes: header id 0x1986, then zero bytes.
+_USDZ_ALIGNMENT = 64
+_PADDING_HEADER_ID = 0x1986
+_ZIP_LOCAL_HEADER_SIZE = 30
+_EXTRA_RECORD_HEADER_SIZE = 4
+
+
+def _alignment_extra_field(header_start: int, arcname: str) -> bytes:
+    """Build the extra field that pushes this entry's data to a 64-byte boundary."""
+    unpadded = header_start + _ZIP_LOCAL_HEADER_SIZE + len(arcname.encode("utf-8"))
+    padding = -unpadded % _USDZ_ALIGNMENT
+    if padding == 0:
+        return b""
+    # An extra field record cannot be shorter than its own 4-byte header, so a
+    # sub-4 gap has to grow by a full alignment block to stay well-formed.
+    if padding < _EXTRA_RECORD_HEADER_SIZE:
+        padding += _USDZ_ALIGNMENT
+    data_size = padding - _EXTRA_RECORD_HEADER_SIZE
+    return struct.pack("<HH", _PADDING_HEADER_ID, data_size) + b"\x00" * data_size
+
+
+def _write_aligned(usdz: zipfile.ZipFile, source_path: str, arcname: str) -> None:
+    """Add a file to *usdz* stored uncompressed and 64-byte aligned."""
+    arcname = arcname.replace(os.sep, "/")
+    zinfo = zipfile.ZipInfo.from_file(source_path, arcname)
+    zinfo.compress_type = zipfile.ZIP_STORED
+    zinfo.extra = _alignment_extra_field(usdz.fp.tell(), arcname)
+
+    with open(source_path, "rb") as src, usdz.open(zinfo, "w") as dst:
+        shutil.copyfileobj(src, dst)
 
 def create_usdz(usd_path: str, output_path: str, settings, context, diagnostics=None):
     """Create USDZ file from USD stage
@@ -22,8 +55,10 @@ def create_usdz(usd_path: str, output_path: str, settings, context, diagnostics=
         context: Blender context
         diagnostics: ExportDiagnostics instance
     """
-    # Check for external usdzip tool first
-    import bpy
+    # Imported here, not at module scope, so the packaging helpers below stay
+    # importable outside Blender.
+    from .. import prefs as addon_prefs
+
     prefs = addon_prefs.get_preferences(context)
     usdzip_path = prefs.usdzip_path if prefs and hasattr(prefs, 'usdzip_path') else None
     
@@ -72,8 +107,8 @@ def create_usdz_python(usd_path: str, output_path: str, settings, diagnostics=No
     with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_STORED) as usdz:
         # Add main USD file at root
         usd_arcname = usd_file.name
-        usdz.write(usd_path, usd_arcname)
-        
+        _write_aligned(usdz, usd_path, usd_arcname)
+
         # Add textures directory if it exists
         textures_dir = usd_dir / "textures"
         if textures_dir.exists():
@@ -81,7 +116,7 @@ def create_usdz_python(usd_path: str, output_path: str, settings, diagnostics=No
                 if texture_file.is_file():
                     # Preserve relative path structure
                     arcname = texture_file.relative_to(usd_dir)
-                    usdz.write(str(texture_file), str(arcname))
+                    _write_aligned(usdz, str(texture_file), str(arcname))
 
         # Add staged assets directory if it exists
         assets_dir = usd_dir / "assets"
@@ -89,7 +124,7 @@ def create_usdz_python(usd_path: str, output_path: str, settings, diagnostics=No
             for asset_file in assets_dir.rglob("*"):
                 if asset_file.is_file():
                     arcname = asset_file.relative_to(usd_dir)
-                    usdz.write(str(asset_file), str(arcname))
+                    _write_aligned(usdz, str(asset_file), str(arcname))
         
         # Add any other referenced assets
         # (This is a simplified implementation - full version would parse USD for all asset references)
