@@ -27,6 +27,16 @@ def apply_force_unlit(settings) -> None:
     settings.force_unlit_materials = resolve_force_unlit(settings)
 
 
+def force_shader_graph_materials(settings) -> None:
+    """Baked exports always author the RealityKit Shader Graph.
+
+    Baking picks Unlit vs Lit PBR via ``bake_mode``, which UsdPreviewSurface
+    cannot express, so Standard Material mode is not combined with baking yet.
+    """
+    if hasattr(settings, "material_mode"):
+        settings.material_mode = "SHADER_GRAPH"
+
+
 def should_apply_yup(settings) -> bool:
     """Y-up geometry bake only applies when orientation conversion is enabled.
 

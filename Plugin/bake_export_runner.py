@@ -418,6 +418,7 @@ def main() -> int:
         )
 
         bake_finalize.apply_force_unlit(scene_settings)
+        bake_finalize.force_shader_graph_materials(scene_settings)
 
         ## Y-up geometry bake when requested (and safe). This runner's scene is a
         ## throwaway background process, so the returned restore state is only

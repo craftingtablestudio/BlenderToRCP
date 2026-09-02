@@ -18,6 +18,7 @@ SETTING_GROUPS: dict[str, set[str]] = {
     "general": {
         "filepath",
         "export_format",
+        "material_mode",
         "root_prim_name",
         "export_animation",
         "author_animation_library",

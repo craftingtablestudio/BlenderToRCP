@@ -148,6 +148,17 @@ class BlenderToRCPExportSettings(PropertyGroup):
         update=_on_settings_changed,
     )
     
+    material_mode: EnumProperty(
+        name="Materials",
+        description="Choose how materials are authored in the exported USD",
+        items=[
+            ('SHADER_GRAPH', "RealityKit Shader Graph", "Author a RealityKit MaterialX shader network. Opens as a Shader Graph in Reality Composer Pro"),
+            ('PREVIEW_SURFACE', "Standard Material", "Author a plain OpenUSD UsdPreviewSurface bound to the mesh. Opens in the Reality Composer Pro material inspector, where base color and other inputs can be overridden directly"),
+        ],
+        default='SHADER_GRAPH',
+        update=_on_settings_changed,
+    )
+
     root_prim_name: StringProperty(
         name="Root Prim",
         description="Root prim path or name (e.g. /root or Scene)",
@@ -687,6 +698,7 @@ class BLENDERTORCP_PT_export_panel(Panel):
             export_box.enabled = not _is_job_running(settings)
             export_box.prop(settings, "filepath")
             export_box.prop(settings, "export_format")
+            export_box.prop(settings, "material_mode")
 
             actions_box = layout.box()
             actions_box.label(text="Actions", icon='PLAY')

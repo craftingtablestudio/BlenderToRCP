@@ -102,8 +102,11 @@ class BLENDERTORCP_OT_export(Operator, ExportHelper):
         diag.data["scene"] = collect_scene_snapshot(context)
 
         from ..nodes import validate as rk_validate
+        from ..export.material_mode import is_preview_surface
 
-        materials = rk_validate.collect_scene_materials(context)
+        # Strict validation only guards the MaterialX conversion, so it would
+        # block exports that Standard Material mode handles fine.
+        materials = [] if is_preview_surface(settings) else rk_validate.collect_scene_materials(context)
         for material in materials:
             try:
                 result = rk_validate.validate_material(material, strict=True)

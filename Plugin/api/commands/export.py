@@ -15,6 +15,7 @@ def handle(args: dict) -> dict:
     from Plugin.export import blender_usd_export, postprocess_usd, pack_usdz, diagnostics, bake_finalize
     from Plugin.export.support_bundle import collect_environment, collect_scene_snapshot
     from Plugin.nodes import validate as rk_validate
+    from Plugin.export.material_mode import is_preview_surface
 
     filepath = args.get("filepath")
     if not filepath:
@@ -78,8 +79,9 @@ def handle(args: dict) -> dict:
     diag.set_environment(**collect_environment(bpy.context))
     diag.data["scene"] = collect_scene_snapshot(bpy.context)
 
-    # Validate materials (strict mode — same as the operator)
-    materials = rk_validate.collect_scene_materials(bpy.context)
+    # Validate materials (strict mode — same as the operator). Standard Material
+    # mode skips it: the gate only guards the MaterialX conversion.
+    materials = [] if is_preview_surface(settings) else rk_validate.collect_scene_materials(bpy.context)
     for mat in materials:
         try:
             result = rk_validate.validate_material(mat, strict=True)

@@ -3,6 +3,7 @@ Material rewrite orchestration for USD stages.
 """
 
 from ..usd_utils import UsdShade, UsdGeom
+from ..material_mode import is_preview_surface
 from ...manifest.materialx_nodes import load_manifest
 from .graph import MaterialXGraphBuilder
 from .extract import extract_blender_material_data, collect_material_warnings
@@ -11,7 +12,20 @@ from .helpers import _get_blender_data_name
 
 
 def rewrite_materials(stage, settings, context, diagnostics=None) -> None:
-    """Rewrite materials to MaterialX graphs (Pass 2)."""
+    """Rewrite materials to MaterialX graphs (Pass 2).
+
+    In ``PREVIEW_SURFACE`` mode this is a no-op: Blender's exporter already
+    authored a UsdPreviewSurface network and the ``material:binding`` on each
+    mesh, and leaving it untouched is exactly the requested output.
+    """
+    if is_preview_surface(settings):
+        if diagnostics:
+            diagnostics.add_warning(
+                "Material mode is Standard Material: keeping Blender's "
+                "UsdPreviewSurface network and skipping RealityKit Shader Graph authoring."
+            )
+        return
+
     manifest = load_manifest()
     builder = MaterialXGraphBuilder(manifest, diagnostics)
     force_unlit = bool(getattr(settings, "force_unlit_materials", False))

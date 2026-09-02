@@ -207,6 +207,7 @@ def handle(args: dict) -> dict:
         # Author Lit PBR only for "Material Color Only - Lit PBR"; every other
         # bake mode stays Unlit — same as the interactive path.
         bake_finalize.apply_force_unlit(settings)
+        bake_finalize.force_shader_graph_materials(settings)
 
         # Y-up geometry bake when requested (and safe). This runs in a throwaway
         # background scene, so the returned restore state is only used to decide
